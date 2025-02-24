@@ -1,6 +1,5 @@
 import Image from "next/image";
-import 'tailwindcss';
-
+import { useEffect, useState } from "react";
 
 export default function Home() {
   return (
