@@ -3,8 +3,7 @@
 import Link from "next/link";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Image from "next/image";
-import { MdFitnessCenter, MdLogout, MdDirectionsBike } from "react-icons/md";
-import { FaApple } from "react-icons/fa";
+import { MdFitnessCenter, MdLogout, MdDirectionsBike, MdWatch } from "react-icons/md";
 
 export default function VerticalNavbar() {
   return (
@@ -27,13 +26,35 @@ export default function VerticalNavbar() {
               </a>
             </Link>
           </li>
-          <li className="nav-item">
-            <Link href="/connect-apple-health" passHref legacyBehavior>
-              <a className="nav-link">
-                <FaApple className="me-2" />
-                Connect to Apple Health
-              </a>
-            </Link>
+          <li className="nav-item dropdown">
+            <a
+              className="nav-link dropdown-toggle"
+              href="#"
+              id="smartwatchDropdown"
+              role="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <MdWatch className="me-2" />
+              Connect my SmartWatch
+            </a>
+            <ul className="dropdown-menu" aria-labelledby="smartwatchDropdown">
+              <li>
+                <Link href="/connect-apple" passHref legacyBehavior>
+                  <a className="dropdown-item">Apple Watch</a>
+                </Link>
+              </li>
+              <li>
+                <Link href="/connect-coros" passHref legacyBehavior>
+                  <a className="dropdown-item">COROS</a>
+                </Link>
+              </li>
+              <li>
+                <Link href="/connect-garmin" passHref legacyBehavior>
+                  <a className="dropdown-item">Garmin</a>
+                </Link>
+              </li>
+            </ul>
           </li>
           <li className="nav-item">
             <Link href="/connect-strava" passHref legacyBehavior>

@@ -7,35 +7,28 @@
       "esnext"
     ],
     "allowJs": true,
-    "skipLibCheck": false,
+    "skipLibCheck": true,
     "strict": false,
     "noEmit": true,
-    "esModuleInterop": true,
+    "incremental": true,
     "module": "esnext",
+    "esModuleInterop": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "incremental": true,
     "plugins": [
       {
         "name": "next"
       }
     ],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "apps/frontend/src/*"
-      ]
-    },
     "strictNullChecks": true
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
     ".next/types/**/*.ts",
-    "apps/frontend/src/**/*.ts"
+    "**/*.ts",
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules"
