@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { code } = req.query; // Strava OAuth code
+  const { code } = req.query;
   const CLIENT_ID = process.env.STRAVA_CLIENT_ID;
   const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
 
