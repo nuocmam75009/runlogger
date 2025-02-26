@@ -1,26 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../lib/prisma";
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 // Log available models to debug
 console.log('Available models on prisma:', Object.keys(prisma));
 
 export async function POST(req: Request) {
   try {
-    const { userId, type, duration } = await req.json();
+    const body = await req.json() as any;
+    const { userId, type, duration } = body;
 
     if (!userId || !type || !duration) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Create with correct field structure
-    const data: Prisma.WorkoutCreateInput = {
-      user: { connect: { id: userId } },
-      type: type as any,
-      duration: duration
-    };
-
-    const newWorkout = await prisma.workout.create({ data });
+    // Create workout without using the missing type
+    const newWorkout = await prisma.workout.create({
+      data: {
+        user: { connect: { id: userId } },
+        type: type as any,
+        duration: Number(duration)
+      }
+    });
 
     return NextResponse.json(newWorkout, { status: 201 });
   } catch (error) {

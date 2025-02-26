@@ -54,3 +54,10 @@ next-env.d.ts
 
 # NextAuth
 /apps/frontend/src/pages/api/auth
+
+./apps/backend/.next
+/apps/backend/.next
+/apps/backend/dist
+
+/apps/migrations
+/apps/frontend/migrations
