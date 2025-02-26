@@ -8,7 +8,6 @@ interface AddWorkoutProps {
 }
 
 
-
 const getWorkoutTypeName = (type: string): string => {
   return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 };
@@ -49,7 +48,6 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId }) => {
       // Reset form
       setType('');
       setDuration(0);
-
 
       router.reload();
     } catch (error) {

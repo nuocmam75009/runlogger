@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-interface Workout {
-  id: string;
-  type: string;
-  duration: number;
-  date: Date;
-}
+import { Workout } from '@prisma/client';
 
 interface WorkoutListProps {
   userId: string;
