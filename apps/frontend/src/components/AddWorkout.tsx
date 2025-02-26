@@ -7,30 +7,8 @@ interface AddWorkoutProps {
   userId: string;
 }
 
-/* enum WorkoutType {
-  RUNNING = 'RUNNING',
-  CYCLING = 'CYCLING',
-  SWIMMING = 'SWIMMING',
-  STRENGTH_TRAINING = 'STRENGTH_TRAINING',
-  YOGA = 'YOGA',
-  HIKING = 'HIKING',
-  CROSS_TRAINING = 'CROSS_TRAINING',
-  SKIING = 'SKIING',
-  INDOOR_CYCLING = 'INDOOR_CYCLING',
-  INDOOR_RUNNING = 'INDOOR_RUNNING',
-  INDOOR_WALKING = 'INDOOR_WALKING',
-  STAIRMASTER = 'STAIRMASTER',
-  TRIATHLON = 'TRIATHLON',
-  TRAIL_RUNNING = 'TRAIL_RUNNING',
-  KICKBOXING = 'KICKBOXING',
-  PILATES = 'PILATES',
-  DANSE = 'DANSE',
-  OTHER = 'OTHER'
-} */
 
 
-
-// Helper function to get human-readable name
 const getWorkoutTypeName = (type: string): string => {
   return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 };
@@ -43,7 +21,7 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId }) => {
   const router = useRouter();
   const { data: session } = useSession();
 
-  // Get all workout types from the enum
+
   useEffect(() => {
     setWorkoutTypes(Object.values(WorkoutType));
   }, []);
@@ -72,7 +50,7 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId }) => {
       setType('');
       setDuration(0);
 
-      // Refresh the page or redirect
+
       router.reload();
     } catch (error) {
       console.error('Error adding workout:', error);
