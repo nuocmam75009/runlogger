@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { WorkoutType } from '@prisma/client';
 
 interface AddWorkoutProps {
   userId: string;
 }
 
-// Define the workout types enum based on your schema
-enum WorkoutType {
+/* enum WorkoutType {
   RUNNING = 'RUNNING',
   CYCLING = 'CYCLING',
   SWIMMING = 'SWIMMING',
@@ -26,7 +26,9 @@ enum WorkoutType {
   PILATES = 'PILATES',
   DANSE = 'DANSE',
   OTHER = 'OTHER'
-}
+} */
+
+
 
 // Helper function to get human-readable name
 const getWorkoutTypeName = (type: string): string => {
