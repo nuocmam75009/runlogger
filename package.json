@@ -16,7 +16,7 @@
     "@mui/material": "^6.4.5",
     "@nestjs/core": "^11.0.10",
     "@next-auth/prisma-adapter": "^1.0.7",
-    "@prisma/client": "6.4.1",
+    "@prisma/client": "^6.4.1",
     "autoprefixer": "^10.4.20",
     "bootstrap": "^5.3.3",
     "next": "^15.1.7",
@@ -24,6 +24,7 @@
     "nextjs": "^0.0.3",
     "prisma": "^6.4.1",
     "react": "^19.0.0",
+    "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0"
   },

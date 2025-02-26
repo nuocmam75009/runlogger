@@ -41,3 +41,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+/migrations
+/prisma/dev.db
+/prisma/dev.db-journal
+/prisma/dev.db-trace.json
+/prisma/dev.db-trace.jsonl
+/prisma/dev.db-trace.jsonl.gz
+/prisma/dev.db-trace.jsonl.gz.part
+/prisma/dev.db-trace.jsonl.gz.part.1
+
+# NextAuth
+/apps/frontend/src/pages/api/auth

@@ -1,0 +1,101 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  dateOfBirth   DateTime?
+  createdAt     DateTime  @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  runs          Run[]
+  Workout       Workout[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Run {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime
+  distance  Float
+  time      Int
+  pace      Int
+  heartRate Int?
+  cadence   Int?
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+enum WorkoutType {
+  RUNNING
+  CYCLING
+  SWIMMING
+  STRENGTH_TRAINING
+  YOGA
+  HIKING
+  CROSS_TRAINING
+  SKIING
+  INDOOR_CYCLING
+  INDOOR_RUNNING
+  INDOOR_WALKING
+  STAIRMASTER
+  TRIATHLON
+  TRAIL_RUNNING
+  KICKBOXING
+  PILATES
+  DANSE
+  OTHER
+}
+
+model Workout {
+  id       String      @id @default(uuid())
+  userId   String      @map("user_id")
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     WorkoutType
+  duration Int // In minutes
+  date     DateTime    @default(now())
+}
