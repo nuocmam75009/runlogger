@@ -6,7 +6,6 @@ interface WorkoutListProps {
 }
 
 interface StravaWorkout {
-    // rajouter ça dans schema prisma pour BDD
   id: string;
   name: string;
   type: string;
@@ -14,6 +13,25 @@ interface StravaWorkout {
   moving_time: number;
   start_date: string;
   total_elevation_gain: number;
+  average_speed: number;
+  average_heartrate: number;
+  max_heartrate: number;
+  average_cadence: number;
+  average_watts: number;
+  max_watts: number;
+  average_temp: number;
+}
+
+interface CombinedWorkout {
+  id: string;
+  title: string;
+  type: string;
+  duration: number;
+  date: Date;
+  source: 'manual' | 'strava';
+  distance?: number;
+  elevationGain?: number;
+  additionalData?: any;
 }
 
 interface ConnectionTestResult {
@@ -24,9 +42,15 @@ interface ConnectionTestResult {
   possibleSolutions?: string[];
 }
 
+//  todo: Link to Enum WorkoutSource
+type SourceFilter = 'all' | 'manual' | 'strava' | 'nike_run_club' | 'apple_health' | 'kiprun_pacer' | 'garmin' | 'coros' | 'suunto';
+
 const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [manualWorkouts, setManualWorkouts] = useState<Workout[]>([]);
   const [stravaWorkouts, setStravaWorkouts] = useState<StravaWorkout[]>([]);
+  const [combinedWorkouts, setCombinedWorkouts] = useState<CombinedWorkout[]>([]);
+  const [filteredWorkouts, setFilteredWorkouts] = useState<CombinedWorkout[]>([]);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [loading, setLoading] = useState(true);
   const [stravaLoading, setStravaLoading] = useState(true);
   const [stravaConnected, setStravaConnected] = useState(false);
@@ -34,6 +58,7 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
 
+  // Fetch manual workouts
   useEffect(() => {
     const fetchWorkouts = async () => {
       try {
@@ -42,7 +67,7 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
           throw new Error('Failed to fetch workouts');
         }
         const data = await response.json();
-        setWorkouts(data);
+        setManualWorkouts(data);
       } catch (error) {
         console.error('Error fetching workouts:', error);
       } finally {
@@ -50,6 +75,11 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
       }
     };
 
+    fetchWorkouts();
+  }, [userId]);
+
+  // Fetch Strava workouts
+  useEffect(() => {
     const fetchStravaWorkouts = async () => {
       try {
         setStravaLoading(true);
@@ -87,9 +117,56 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
       }
     };
 
-    fetchWorkouts();
     fetchStravaWorkouts();
   }, [userId]);
+
+  // Combine workouts when either source changes
+  useEffect(() => {
+    const combined: CombinedWorkout[] = [
+      // Map manual workouts
+      ...manualWorkouts.map(workout => ({
+        id: workout.id,
+        title: workout.type,
+        type: workout.type,
+        duration: workout.duration,
+        date: new Date(workout.date),
+        source: 'manual' as const,
+      })),
+
+      ...stravaWorkouts.map(workout => ({
+        id: workout.id,
+        title: workout.name,
+        type: workout.type,
+        duration: Math.round(workout.moving_time / 60),
+        date: new Date(workout.start_date),
+        source: 'strava' as const,
+        distance: workout.distance,
+        elevationGain: workout.total_elevation_gain,
+        additionalData: {
+          averageHeartRate: workout.average_heartrate,
+          maxHeartRate: workout.max_heartrate,
+          averageCadence: workout.average_cadence,
+          averageWatts: workout.average_watts,
+          maxWatts: workout.max_watts,
+          averageTemp: workout.average_temp,
+        }
+      }))
+    ];
+
+    // Sort by date, newest first
+    combined.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    setCombinedWorkouts(combined);
+  }, [manualWorkouts, stravaWorkouts]);
+
+  // Apply source filter when combinedWorkouts or sourceFilter changes
+  useEffect(() => {
+    if (sourceFilter === 'all') {
+      setFilteredWorkouts(combinedWorkouts);
+    } else {
+      setFilteredWorkouts(combinedWorkouts.filter(workout => workout.source === sourceFilter));
+    }
+  }, [combinedWorkouts, sourceFilter]);
 
   const testBackendConnection = async () => {
     try {
@@ -120,106 +197,110 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ userId }) => {
     <div>
       <h2>Your Workouts</h2>
 
-      {/* Regular workouts */}
-      {workouts.length === 0 ? (
-        <p>No workouts found.</p>
-      ) : (
-        <div className="mb-4">
-          <h3>Manual Workouts</h3>
-          <ul className="list-group">
-            {workouts.map((workout) => (
-              <li key={workout.id} className="list-group-item">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>{workout.type}</strong>
-                    <p className="mb-0">Duration: {workout.duration} minutes</p>
-                    <small>{new Date(workout.date).toLocaleDateString()}</small>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+      {/* Strava connection prompt if not connected */}
+      {!stravaConnected && (
+        <div className="alert alert-info mb-4">
+          <p>Connect your Strava account to see all your workouts in one place.</p>
+          <button className="btn btn-primary" onClick={connectStrava}>
+            Connect Strava
+          </button>
         </div>
       )}
 
-      {/* Strava workouts */}
-      <div className="mt-4">
-        <h3>Strava Workouts</h3>
-
-        {/* Connection test results */}
-        {connectionTest && (
-          <div className={`alert ${connectionTest.success ? 'alert-success' : 'alert-danger'} mb-3`}>
-            <h5>{connectionTest.message}</h5>
-            {connectionTest.backendUrl && (
-              <p>Backend URL: {connectionTest.backendUrl}</p>
-            )}
-            {connectionTest.error && (
-              <p>Error: {connectionTest.error}</p>
-            )}
-            {connectionTest.possibleSolutions && (
-              <>
-                <p className="mb-1">Possible solutions:</p>
-                <ul>
-                  {connectionTest.possibleSolutions.map((solution, index) => (
-                    <li key={index}>{solution}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-        )}
-
-        {stravaError && (
-          <div className="alert alert-warning">
-            <p>Error connecting to Strava: {stravaError}</p>
-            <p className="mb-0">This could be due to:</p>
-            <ul>
-              <li>Backend server not running (should be on port 3001)</li>
-              <li>Missing Strava API credentials in backend</li>
-              <li>Not authenticated with Strava</li>
-            </ul>
-            <button
-              className="btn btn-outline-primary mt-2"
-              onClick={testBackendConnection}
-              disabled={testingConnection}
-            >
-              {testingConnection ? 'Testing Connection...' : 'Test Backend Connection'}
-            </button>
-          </div>
-        )}
-
-        {!stravaConnected ? (
-          <div className="alert alert-info">
-            <p>Connect your Strava account to see your workouts here.</p>
-            <button className="btn btn-primary" onClick={connectStrava}>
-              Connect Strava
-            </button>
-          </div>
-        ) : stravaLoading ? (
-          <p>Loading Strava workouts...</p>
-        ) : stravaWorkouts.length === 0 ? (
-          <p>No Strava workouts found.</p>
-        ) : (
-          <ul className="list-group">
-            {stravaWorkouts.map((workout) => (
-              <li key={workout.id} className="list-group-item">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>{workout.name}</strong>
-                    <p className="mb-0">Type: {workout.type}</p>
-                    <p className="mb-0">Duration: {Math.round(workout.moving_time / 60)} minutes</p>
-                    <p className="mb-0">Distance: {(workout.distance / 1000).toFixed(2)} km</p>
-                    {workout.total_elevation_gain > 0 && (
-                      <p className="mb-0">Elevation Gain: {workout.total_elevation_gain} m</p>
-                    )}
-                    <small>{new Date(workout.start_date).toLocaleDateString()}</small>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+      {/* Source filter */}
+      <div className="mb-4">
+        <div className="btn-group" role="group" aria-label="Filter workouts by source">
+          <button
+            type="button"
+            className={`btn ${sourceFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setSourceFilter('all')}
+          >
+            All Sources
+          </button>
+          <button
+            type="button"
+            className={`btn ${sourceFilter === 'manual' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setSourceFilter('manual')}
+          >
+            Manual Only
+          </button>
+          <button
+            type="button"
+            className={`btn ${sourceFilter === 'strava' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setSourceFilter('strava')}
+            disabled={!stravaConnected}
+          >
+            Strava Only
+          </button>
+        </div>
       </div>
+
+      {/* Combined workouts list */}
+      {filteredWorkouts.length === 0 ? (
+        <p>No workouts found with the selected filter. {sourceFilter !== 'all' && <button className="btn btn-link p-0" onClick={() => setSourceFilter('all')}>Show all workouts</button>}</p>
+      ) : (
+        <ul className="list-group">
+          {filteredWorkouts.map((workout) => (
+            <li key={workout.id} className="list-group-item">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  {/* Source badge */}
+                  <div className="mb-2">
+                    {workout.source === 'strava' ? (
+                      <span className="badge bg-orange text-white me-2" style={{ backgroundColor: '#FC4C02' }}>
+                        Strava
+                      </span>
+                    ) : (
+                      <span className="badge bg-secondary text-white me-2">
+                        Added Manually
+                      </span>
+                    )}
+                    <span className="text-muted small">
+                      {workout.date.toLocaleDateString()} {workout.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  {/* Workout title */}
+                  <h5 className="mb-1">{workout.title}</h5>
+
+                  {/* Basic workout info */}
+                  <p className="mb-0">Type: {workout.type}</p>
+                  <p className="mb-0">Duration: {workout.duration} minutes</p>
+
+                  {/* Strava-specific data */}
+                  {workout.source === 'strava' && (
+                    <div className="mt-2">
+                      {workout.distance && (
+                        <p className="mb-0">Distance: {(workout.distance / 1000).toFixed(2)} km</p>
+                      )}
+                      {workout.elevationGain && workout.elevationGain > 0 && (
+                        <p className="mb-0">Elevation Gain: {workout.elevationGain} m</p>
+                      )}
+                      {workout.additionalData?.averageHeartRate && (
+                        <p className="mb-0">Heart Rate: {Math.round(workout.additionalData.averageHeartRate)} bpm</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Error display */}
+      {stravaError && (
+        <div className="alert alert-warning mt-4">
+          <p>Error connecting to Strava: {stravaError}</p>
+          <button
+            className="btn btn-outline-primary mt-2"
+            onClick={testBackendConnection}
+            disabled={testingConnection}
+          >
+            {testingConnection ? 'Testing Connection...' : 'Test Backend Connection'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

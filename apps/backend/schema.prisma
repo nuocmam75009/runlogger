@@ -98,4 +98,16 @@ model Workout {
   type     WorkoutType
   duration Int // In minutes
   date     DateTime    @default(now())
+  source WorkoutSource
+}
+
+enum WorkoutSource {
+  STRAVA
+  NIKE_RUN_CLUB
+  APPLE_HEALTH
+  KIPRUN_PACER
+  GARMIN
+  COROS
+  SUUNTO
+  MANUAL
 }

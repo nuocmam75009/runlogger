@@ -8,18 +8,22 @@ console.log('Available models on prisma:', Object.keys(prisma));
 export async function POST(req: Request) {
   try {
     const body = await req.json() as any;
-    const { userId, type, duration } = body;
+    const { userId, type, duration, distance, gear, intensity, notes } = body;
 
     if (!userId || !type || !duration) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Create workout without using the missing type
+    // Create workout with all fields
     const newWorkout = await prisma.workout.create({
       data: {
         user: { connect: { id: userId } },
         type: type as any,
-        duration: Number(duration)
+        duration: Number(duration),
+        distance: distance ? Number(distance) : null,
+        gear: gear || null,
+        intensity: intensity || null,
+        notes: notes || null
       }
     });
 
