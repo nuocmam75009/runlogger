@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, ButtonGroup, ToggleButton } from 'react-bootstrap';
+import { Container, Row, Col, Card, ButtonGroup, ToggleButton, Form } from 'react-bootstrap';
 import { Workout } from '@prisma/client';
 import { WorkoutType, IntensityLevel, formatWorkoutType, WorkoutStat } from 'shared-types';
 import { useSession } from 'next-auth/react';
@@ -18,20 +18,42 @@ interface ChartProps {
 type ChartMetric = 'duration' | 'distance' | 'count' | 'elevationGain' | 'calories' | 'heartRate';
 type ChartPeriod = 'week' | 'month' | 'year';
 type ChartType = 'area' | 'bar' | 'line' | 'pie';
+type DateFilter = 'week' | 'month' | 'year' | 'all';
 
 interface PieDataItem {
   name: string;
   value: number;
 }
 
-export default function WorkoutAnalysis({ userId, refreshTrigger }: ChartProps) {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const [chartData, setChartData] = useState<WorkoutStat[]>([]);
+interface WorkoutData {
+  id: string;
+  type: string;
+  duration: number;
+  distance?: number | null;
+  date: Date;
+  heartRate?: number | null;
+  elevationGain?: number | null;
+  calories?: number | null;
+}
+
+interface ChartDataPoint {
+  date: string;
+  heartRate?: number;
+  distance?: number;
+  originalHeartRate?: number | null;
+  originalDistance?: number | null;
+}
+
+const WorkoutAnalysis: React.FC<ChartProps> = ({ userId, refreshTrigger }) => {
+    const { data: session } = useSession();
+    const router = useRouter();
+  const [workouts, setWorkouts] = useState<WorkoutData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [metric, setMetric] = useState<ChartMetric>('duration');
-  const [period, setPeriod] = useState<ChartPeriod>('month');
-  const [chartType, setChartType] = useState<ChartType>('area');
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("month");
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [chartType, setChartType] = useState<'heartRate' | 'distance'>('heartRate');
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [totalStats, setTotalStats] = useState({
     workouts: 0,
     duration: 0,
@@ -53,6 +75,7 @@ export default function WorkoutAnalysis({ userId, refreshTrigger }: ChartProps) 
     veryHard: '#F44336'
   };
 
+  // Fetch workouts
   useEffect(() => {
     if (!userId) return;
 
@@ -63,496 +86,343 @@ export default function WorkoutAnalysis({ userId, refreshTrigger }: ChartProps) 
         if (!response.ok) {
           throw new Error("Failed to fetch workouts");
         }
-        const workouts = await response.json();
+        const data = await response.json();
 
-        // Process workouts into chart data
-        processWorkoutsData(workouts);
+        console.log("Raw API response:", data); // Debug the raw API response
+
+        // Transform and sort workouts by date
+        const transformedWorkouts = data.map((workout: any) => ({
+          id: workout.id,
+          type: workout.type,
+          duration: workout.duration,
+          distance: typeof workout.distance === 'number' ? workout.distance : null,
+          date: new Date(workout.date),
+          heartRate: typeof workout.heartRate === 'number' ? workout.heartRate : null,
+          elevationGain: typeof workout.elevationGain === 'number' ? workout.elevationGain : null,
+          calories: typeof workout.calories === 'number' ? workout.calories : null
+        }));
+
+        // Calculate total stats
+        const totals = {
+          workouts: transformedWorkouts.length,
+          duration: transformedWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0),
+          distance: transformedWorkouts.reduce((sum, w) => sum + (w.distance || 0), 0),
+          elevationGain: transformedWorkouts.reduce((sum, w) => sum + (w.elevationGain || 0), 0),
+          calories: transformedWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0)
+        };
+        setTotalStats(totals);
+
+        console.log("Transformed workouts:", transformedWorkouts); // Debug transformed data
+
+        // Sort by date (oldest first for charts)
+        transformedWorkouts.sort((a: WorkoutData, b: WorkoutData) =>
+          a.date.getTime() - b.date.getTime()
+        );
+
+        setWorkouts(transformedWorkouts);
+
+        // Extract unique workout types
+        const types = Array.from(
+          new Set(transformedWorkouts.map((w: WorkoutData) => w.type))
+        ) as string[];
+        setAvailableTypes(types);
       } catch (error) {
-        console.error("Error fetching workouts for chart:", error);
+        console.error("Error fetching workouts:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchWorkouts();
-  }, [userId, refreshTrigger, period]);
+  }, [userId, refreshTrigger]);
 
-  const processWorkoutsData = (workouts: any[]) => {
+  // Apply date filter to workouts
+  const getFilteredByDateWorkouts = (workouts: WorkoutData[]): WorkoutData[] => {
+    if (dateFilter === 'all') return workouts;
+
+    const now = new Date();
+    let cutoffDate = new Date();
+
+    switch (dateFilter) {
+      case 'week':
+        cutoffDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        cutoffDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'year':
+        cutoffDate.setFullYear(now.getFullYear() - 1);
+        break;
+    }
+
+    return workouts.filter(workout => workout.date >= cutoffDate);
+  };
+
+  // Process data for charts when filters change
+  useEffect(() => {
     if (!workouts.length) {
-      setChartData([]);
-      setTotalStats({
-        workouts: 0,
-        duration: 0,
-        distance: 0,
-        elevationGain: 0,
-        calories: 0
-      });
+      console.log("No workouts available for chart data");
       return;
     }
 
-    // Calculate total stats
-    const totals = {
-      workouts: workouts.length,
-      duration: workouts.reduce((sum, w) => sum + (w.duration || 0), 0),
-      distance: workouts.reduce((sum, w) => sum + (w.distance || 0), 0),
-      elevationGain: workouts.reduce((sum, w) => sum + (w.elevationGain || 0), 0),
-      calories: workouts.reduce((sum, w) => sum + (w.calories || 0), 0)
-    };
+    // Apply date filter
+    let dateFilteredWorkouts = getFilteredByDateWorkouts(workouts);
 
-    setTotalStats(totals);
+    // Filter workouts by selected type
+    let filteredWorkouts = dateFilteredWorkouts;
+    if (selectedType !== "all") {
+      filteredWorkouts = dateFilteredWorkouts.filter(workout => workout.type === selectedType);
+    }
 
-    // Sort workouts by date
-    workouts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Limit number of data points for performance
+    const MAX_DATA_POINTS = 50;
+    if (filteredWorkouts.length > MAX_DATA_POINTS) {
+      // For large datasets, sample or aggregate data
+      const step = Math.ceil(filteredWorkouts.length / MAX_DATA_POINTS);
+      filteredWorkouts = filteredWorkouts.filter((_, index) => index % step === 0);
+    }
 
-    // Group workouts by period (week, month, year)
-    const groupedData = new Map<string, WorkoutStat>();
+    // For demonstration purposes, generate some sample data if real data is missing
+    const formattedData = filteredWorkouts.map((workout) => {
+      // Generate sample heart rate data (between 120-180 bpm) if missing
+      const sampleHeartRate = workout.heartRate || (120 + Math.floor(Math.random() * 60));
 
-    workouts.forEach(workout => {
-      const date = new Date(workout.date);
-      let periodKey: string;
+      // Generate sample distance data (between 3-10 km) if missing
+      const sampleDistance = workout.distance ? workout.distance / 1000 : (3 + Math.random() * 7);
 
-      if (period === 'week') {
-        // Get the week number and year
-        const weekNumber = getWeekNumber(date);
-        periodKey = `${date.getFullYear()}-W${weekNumber}`;
-      } else if (period === 'month') {
-        // Format: YYYY-MM
-        periodKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      } else {
-        // Year only
-        periodKey = date.getFullYear().toString();
+      // Format date based on the date filter
+      let dateFormat: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+      if (dateFilter === 'year') {
+        dateFormat = { month: 'short', year: '2-digit' };
       }
 
-      if (!groupedData.has(periodKey)) {
-        groupedData.set(periodKey, {
-          date: periodKey,
-          duration: 0,
-          distance: 0,
-          count: 0,
-          elevationGain: 0,
-          calories: 0,
-          heartRate: 0,
-          runningDuration: 0,
-          cyclingDuration: 0,
-          swimmingDuration: 0,
-          otherDuration: 0,
-          runningDistance: 0,
-          cyclingDistance: 0,
-          swimmingDistance: 0,
-          otherDistance: 0
-        });
-      }
-
-      const stats = groupedData.get(periodKey)!;
-      stats.duration += workout.duration || 0;
-      stats.distance += workout.distance || 0;
-      stats.count += 1;
-      stats.elevationGain += workout.elevationGain || 0;
-      stats.calories += workout.calories || 0;
-
-      // Calculate average heart rate properly
-      if (workout.heartRate) {
-        const currentTotal = stats.heartRate * (stats.count - 1);
-        stats.heartRate = (currentTotal + workout.heartRate) / stats.count;
-      }
-
-      // Group by workout type
-      if (workout.type === WorkoutType.RUNNING || workout.type === WorkoutType.TRAIL_RUNNING) {
-        stats.runningDuration = (stats.runningDuration || 0) + (workout.duration || 0);
-        stats.runningDistance = (stats.runningDistance || 0) + (workout.distance || 0);
-      } else if (workout.type === WorkoutType.CYCLING || workout.type === WorkoutType.INDOOR_CYCLING) {
-        stats.cyclingDuration = (stats.cyclingDuration || 0) + (workout.duration || 0);
-        stats.cyclingDistance = (stats.cyclingDistance || 0) + (workout.distance || 0);
-      } else if (workout.type === WorkoutType.SWIMMING) {
-        stats.swimmingDuration = (stats.swimmingDuration || 0) + (workout.duration || 0);
-        stats.swimmingDistance = (stats.swimmingDistance || 0) + (workout.distance || 0);
-      } else {
-        stats.otherDuration = (stats.otherDuration || 0) + (workout.duration || 0);
-        stats.otherDistance = (stats.otherDistance || 0) + (workout.distance || 0);
-      }
+      return {
+        date: workout.date.toLocaleDateString('en-US', dateFormat),
+        heartRate: sampleHeartRate,
+        distance: sampleDistance,
+        // Include the original values for reference
+        originalHeartRate: workout.heartRate,
+        originalDistance: workout.distance
+      };
     });
 
-    // Convert map to array and sort by date
-    const result = Array.from(groupedData.values());
-    result.sort((a, b) => a.date.localeCompare(b.date));
+    setChartData(formattedData);
+  }, [workouts, selectedType, dateFilter]);
 
-    // Format date labels based on period
-    result.forEach(item => {
-      if (period === 'week') {
-        // Format: Week X
-        const [year, week] = item.date.split('-W');
-        item.date = `W${week}`;
-      } else if (period === 'month') {
-        // Format: MMM YYYY
-        const [year, month] = item.date.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        item.date = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      }
-      // Year stays as is
-    });
-
-    setChartData(result);
-  };
-
-  // Helper function to get week number
-  const getWeekNumber = (date: Date): number => {
-    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
-    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-  };
-
-  const formatYAxis = (value: number): string => {
-    if (metric === 'duration') {
-      return `${value} min`;
-    } else if (metric === 'distance') {
-      return `${value.toFixed(1)} km`;
-    } else if (metric === 'elevationGain') {
-      return `${value} m`;
-    } else if (metric === 'calories') {
-      return `${value} cal`;
-    } else if (metric === 'heartRate') {
-      return `${value} bpm`;
-    }
-    return value.toString();
-  };
-
-  const renderTooltip = (props: any) => {
-    const { active, payload, label } = props;
-
-    if (active && payload && payload.length) {
-      return (
-        <div className="custom-tooltip bg-white p-2 border rounded shadow-sm">
-          <p className="mb-1 fw-bold">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={`item-${index}`} className="mb-0" style={{ color: entry.color }}>
-              {entry.name}: {entry.value} {
-                metric === 'duration' ? 'min' :
-                metric === 'distance' ? 'km' :
-                metric === 'elevationGain' ? 'm' :
-                metric === 'calories' ? 'cal' :
-                metric === 'heartRate' ? 'bpm' : ''
-              }
-            </p>
-          ))}
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  const renderChart = () => {
-    if (loading) {
-      return <div className="text-center py-4">Loading chart data...</div>;
-    }
-
+  const renderHeartRateChart = () => {
     if (chartData.length === 0) {
-      return <div className="text-center py-4">No workout data available</div>;
+      return <div className="text-center py-4">No workout data available for the selected period</div>;
     }
-
-    if (chartType === 'pie') {
-      // For pie charts, we need to transform the data
-      const pieData: PieDataItem[] = [];
-
-      if (metric === 'duration') {
-        if (chartData.reduce((sum, item) => sum + (item.runningDuration || 0), 0) > 0) {
-          pieData.push({ name: 'Running', value: chartData.reduce((sum, item) => sum + (item.runningDuration || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.cyclingDuration || 0), 0) > 0) {
-          pieData.push({ name: 'Cycling', value: chartData.reduce((sum, item) => sum + (item.cyclingDuration || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.swimmingDuration || 0), 0) > 0) {
-          pieData.push({ name: 'Swimming', value: chartData.reduce((sum, item) => sum + (item.swimmingDuration || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.otherDuration || 0), 0) > 0) {
-          pieData.push({ name: 'Other', value: chartData.reduce((sum, item) => sum + (item.otherDuration || 0), 0) });
-        }
-      } else if (metric === 'distance') {
-        if (chartData.reduce((sum, item) => sum + (item.runningDistance || 0), 0) > 0) {
-          pieData.push({ name: 'Running', value: chartData.reduce((sum, item) => sum + (item.runningDistance || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.cyclingDistance || 0), 0) > 0) {
-          pieData.push({ name: 'Cycling', value: chartData.reduce((sum, item) => sum + (item.cyclingDistance || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.swimmingDistance || 0), 0) > 0) {
-          pieData.push({ name: 'Swimming', value: chartData.reduce((sum, item) => sum + (item.swimmingDistance || 0), 0) });
-        }
-        if (chartData.reduce((sum, item) => sum + (item.otherDistance || 0), 0) > 0) {
-          pieData.push({ name: 'Other', value: chartData.reduce((sum, item) => sum + (item.otherDistance || 0), 0) });
-        }
-      } else {
-        // For count, just use the total counts
-        pieData.push({ name: 'Workouts', value: totalStats.workouts });
-      }
-
-      return (
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="value"
-              nameKey="name"
-              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-            >
-              {pieData.map((entry, index) => {
-                let color;
-                if (entry.name === 'Running') color = colors.running;
-                else if (entry.name === 'Cycling') color = colors.cycling;
-                else if (entry.name === 'Swimming') color = colors.swimming;
-                else color = colors.other;
-
-                return <Cell key={`cell-${index}`} fill={color} />;
-              })}
-            </Pie>
-            <Tooltip formatter={(value: any) => {
-              if (metric === 'duration') return [`${value} min`, 'Duration'];
-              if (metric === 'distance') return [`${Number(value).toFixed(1)} km`, 'Distance'];
-              return [value, ''];
-            }} />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      );
-    }
-
-    const ChartComponent = chartType === 'area' ? AreaChart : chartType === 'bar' ? BarChart : LineChart;
-    const DataComponent = chartType === 'area' ? Area : chartType === 'bar' ? Bar : Line;
 
     return (
-      <ResponsiveContainer width="100%" height={220}>
-        <ChartComponent
-          data={chartData}
-          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 12 }}
-            tickMargin={5}
-          />
-          <YAxis
-            tickFormatter={formatYAxis}
-            tick={{ fontSize: 12 }}
-            width={45}
-          />
-          <Tooltip content={renderTooltip} />
-          <Legend wrapperStyle={{ fontSize: '12px', marginTop: '5px' }} />
-
-          {metric === 'duration' ? (
-            <>
-              <DataComponent
-                type="monotone"
-                dataKey="runningDuration"
-                name="Running"
-                stroke={colors.running}
-                fill={colors.running}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="cyclingDuration"
-                name="Cycling"
-                stroke={colors.cycling}
-                fill={colors.cycling}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="swimmingDuration"
-                name="Swimming"
-                stroke={colors.swimming}
-                fill={colors.swimming}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="otherDuration"
-                name="Other"
-                stroke={colors.other}
-                fill={colors.other}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-            </>
-          ) : metric === 'distance' ? (
-            <>
-              <DataComponent
-                type="monotone"
-                dataKey="runningDistance"
-                name="Running"
-                stroke={colors.running}
-                fill={colors.running}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="cyclingDistance"
-                name="Cycling"
-                stroke={colors.cycling}
-                fill={colors.cycling}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="swimmingDistance"
-                name="Swimming"
-                stroke={colors.swimming}
-                fill={colors.swimming}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-              <DataComponent
-                type="monotone"
-                dataKey="otherDistance"
-                name="Other"
-                stroke={colors.other}
-                fill={colors.other}
-                fillOpacity={0.6}
-                stackId={chartType === 'area' ? "1" : undefined}
-              />
-            </>
-          ) : (
-            <DataComponent
-              type="monotone"
-              dataKey={metric}
-              name={
-                metric === 'count' ? 'Workouts' :
-                metric === 'elevationGain' ? 'Elevation Gain (m)' :
-                metric === 'calories' ? 'Calories Burned' :
-                metric === 'heartRate' ? 'Heart Rate (bpm)' : ''
-              }
-              stroke="#8884d8"
-              fill="#8884d8"
-              fillOpacity={0.6}
+      <>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              interval={chartData.length > 20 ? Math.floor(chartData.length / 10) : 0}
             />
-          )}
-        </ChartComponent>
-      </ResponsiveContainer>
+            <YAxis
+              label={{ value: 'Heart Rate (bpm)', angle: -90, position: 'insideLeft' }}
+              domain={['dataMin - 5', 'dataMax + 5']}
+            />
+            <Tooltip formatter={(value) => [`${value} bpm`, 'Heart Rate']} />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="heartRate"
+              name="Heart Rate"
+              stroke="#ff5733"
+              activeDot={{ r: 8 }}
+              strokeWidth={2}
+              dot={chartData.length > 15 ? false : { r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+        {chartData.some(d => !d.originalHeartRate) && (
+          <div className="text-center text-muted small mt-2">
+            <i>Note: Sample heart rate data is shown where actual data is missing</i>
+          </div>
+        )}
+      </>
     );
   };
 
-  if (!session) {
-    router.push('/Login');
-    return null;
+  const renderDistanceChart = () => {
+    if (chartData.length === 0) {
+      return <div className="text-center py-4">No workout data available for the selected period</div>;
+    }
+
+    return (
+      <>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart
+            data={chartData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              interval={chartData.length > 20 ? Math.floor(chartData.length / 10) : 0}
+            />
+            <YAxis
+              label={{ value: 'Distance (km)', angle: -90, position: 'insideLeft' }}
+            />
+            <Tooltip formatter={(value) => [`${value} km`, 'Distance']} />
+            <Legend />
+            <Area
+              type="monotone"
+              dataKey="distance"
+              name="Distance"
+              stroke="#33a1ff"
+              fill="#33a1ff"
+              fillOpacity={0.3}
+            />
+                </AreaChart>
+            </ResponsiveContainer>
+        {chartData.some(d => !d.originalDistance) && (
+          <div className="text-center text-muted small mt-2">
+            <i>Note: Sample distance data is shown where actual data is missing</i>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  if (loading) {
+    return <div className="text-center py-4">Loading workout data...</div>;
   }
 
   return (
-    <Container className="py-5">
-      <h2>Your workout charts</h2>
-      <p>Work in progress: charts of your workouts</p>
+    <Container fluid className="p-0">
+      <h4 className="mb-3">Endurance Analysis</h4>
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3 className="h5 mb-0">Workout Analysis</h3>
+      <Row className="mb-3">
+        <Col xs={12} md={4} className="mb-2 mb-md-0">
+          <Form.Group>
+            <Form.Label>Filter by Workout Type</Form.Label>
+            <Form.Select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+            >
+              <option value="all">All Workout Types</option>
+              {availableTypes.map(type => (
+                <option key={type} value={type}>
+                  {formatWorkoutType(type)}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+        </Col>
 
-        <div className="d-flex gap-2">
-          {/* Chart Type Selector */}
-          <ButtonGroup size="sm">
-            {[
-              { name: 'Area', value: 'area' },
-              { name: 'Bar', value: 'bar' },
-              { name: 'Line', value: 'line' },
-              { name: 'Pie', value: 'pie' }
-            ].map((type) => (
+        <Col xs={12} md={4} className="mb-2 mb-md-0">
+          <Form.Group>
+            <Form.Label>Time Period</Form.Label>
+            <ButtonGroup className="d-flex">
               <ToggleButton
-                key={type.value}
-                id={`chart-type-${type.value}`}
+                id="date-filter-week"
                 type="radio"
                 variant="outline-secondary"
-                name="chart-type"
-                value={type.value}
-                checked={chartType === type.value}
-                onChange={(e) => setChartType(e.currentTarget.value as ChartType)}
+                name="date-filter"
+                value="week"
+                checked={dateFilter === 'week'}
+                onChange={() => setDateFilter('week')}
                 size="sm"
               >
-                {type.name}
+                Week
               </ToggleButton>
-            ))}
-          </ButtonGroup>
-        </div>
-      </div>
+              <ToggleButton
+                id="date-filter-month"
+                type="radio"
+                variant="outline-secondary"
+                name="date-filter"
+                value="month"
+                checked={dateFilter === 'month'}
+                onChange={() => setDateFilter('month')}
+                size="sm"
+              >
+                Month
+              </ToggleButton>
+              <ToggleButton
+                id="date-filter-year"
+                type="radio"
+                variant="outline-secondary"
+                name="date-filter"
+                value="year"
+                checked={dateFilter === 'year'}
+                onChange={() => setDateFilter('year')}
+                size="sm"
+              >
+                Year
+              </ToggleButton>
+              <ToggleButton
+                id="date-filter-all"
+                type="radio"
+                variant="outline-secondary"
+                name="date-filter"
+                value="all"
+                checked={dateFilter === 'all'}
+                onChange={() => setDateFilter('all')}
+                size="sm"
+              >
+                All
+              </ToggleButton>
+            </ButtonGroup>
+          </Form.Group>
+        </Col>
 
-      <div className="d-flex justify-content-between mb-3">
-        {/* Metric Selector */}
-        <ButtonGroup size="sm">
-          {[
-            { name: 'Duration', value: 'duration' },
-            { name: 'Distance', value: 'distance' },
-            { name: 'Count', value: 'count' },
-            { name: 'Elevation', value: 'elevationGain' },
-            { name: 'Calories', value: 'calories' },
-            { name: 'Heart Rate', value: 'heartRate' }
-          ].map((m) => (
-            <ToggleButton
-              key={m.value}
-              id={`metric-${m.value}`}
-              type="radio"
-              variant="outline-primary"
-              name="metric"
-              value={m.value}
-              checked={metric === m.value}
-              onChange={(e) => setMetric(e.currentTarget.value as ChartMetric)}
-              size="sm"
-            >
-              {m.name}
-            </ToggleButton>
-          ))}
-        </ButtonGroup>
+        <Col xs={12} md={4}>
+          <Form.Label>Chart Type</Form.Label>
+          <div>
+            <ButtonGroup>
+              <ToggleButton
+                id="chart-type-heartrate"
+                type="radio"
+                variant="outline-primary"
+                name="chart-type"
+                value="heartRate"
+                checked={chartType === 'heartRate'}
+                onChange={() => setChartType('heartRate')}
+              >
+                Heart Rate
+              </ToggleButton>
+              <ToggleButton
+                id="chart-type-distance"
+                type="radio"
+                variant="outline-primary"
+                name="chart-type"
+                value="distance"
+                checked={chartType === 'distance'}
+                onChange={() => setChartType('distance')}
+              >
+                Distance
+              </ToggleButton>
+            </ButtonGroup>
+          </div>
+        </Col>
+      </Row>
 
-        {/* Period Selector */}
-        <ButtonGroup size="sm">
-          {[
-            { name: 'Weekly', value: 'week' },
-            { name: 'Monthly', value: 'month' },
-            { name: 'Yearly', value: 'year' }
-          ].map((p) => (
-            <ToggleButton
-              key={p.value}
-              id={`period-${p.value}`}
-              type="radio"
-              variant="outline-secondary"
-              name="period"
-              value={p.value}
-              checked={period === p.value}
-              onChange={(e) => setPeriod(e.currentTarget.value as ChartPeriod)}
-              size="sm"
-            >
-              {p.name}
-            </ToggleButton>
-          ))}
-        </ButtonGroup>
-      </div>
+      <Card className="mb-4">
+        <Card.Body>
+          {chartType === 'heartRate' ? renderHeartRateChart() : renderDistanceChart()}
+        </Card.Body>
+      </Card>
 
-      {/* Stats Summary */}
-      <div className="stats-summary d-flex flex-wrap justify-content-between mb-3">
-        <div className="stat-item text-center px-2">
-          <div className="h4 mb-0">{totalStats.workouts}</div>
-          <div className="small text-muted">Workouts</div>
+      {workouts.length > 0 && (
+        <div className="text-muted small">
+          Showing data for {chartData.length} workouts
+          {selectedType !== "all" && ` (filtered to ${formatWorkoutType(selectedType)})`}
+          {dateFilter !== "all" && ` from the past ${dateFilter}`}
         </div>
-        <div className="stat-item text-center px-2">
-          <div className="h4 mb-0">{totalStats.duration}</div>
-          <div className="small text-muted">Minutes</div>
-        </div>
-        <div className="stat-item text-center px-2">
-          <div className="h4 mb-0">{(totalStats.distance / 1000).toFixed(1)}</div>
-          <div className="small text-muted">Kilometers</div>
-        </div>
-        <div className="stat-item text-center px-2">
-          <div className="h4 mb-0">{totalStats.calories.toLocaleString()}</div>
-          <div className="small text-muted">Calories</div>
-        </div>
-      </div>
-
-      {renderChart()}
+      )}
     </Container>
   );
-}
+};
+
+export default WorkoutAnalysis;
