@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../lib/prisma";
-import { PrismaClient } from '@prisma/client';
+import { WorkoutSource } from '@prisma/client';
 
 // Log available models to debug
 console.log('Available models on prisma:', Object.keys(prisma));
@@ -14,7 +14,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Create workout with all fields
     const newWorkout = await prisma.workout.create({
       data: {
         user: { connect: { id: userId } },
@@ -23,7 +22,8 @@ export async function POST(req: Request) {
         distance: distance ? Number(distance) : null,
         gear: gear || null,
         intensity: intensity || null,
-        notes: notes || null
+        notes: notes || null,
+        source: WorkoutSource.MANUAL,
       }
     });
 

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "shared-types": "file:../../packages/shared-types"
+  }
+}

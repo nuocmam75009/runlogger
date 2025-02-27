@@ -61,3 +61,10 @@ next-env.d.ts
 
 /apps/migrations
 /apps/frontend/migrations
+/packages/shared-types/dist
+/packages/shared-types/node_modules
+/packages/shared-types/.next
+/packages/shared-types/.git
+/packages/shared-types/.gitignore
+/packages/shared-types/.env
+/packages/shared-types/.env.local
