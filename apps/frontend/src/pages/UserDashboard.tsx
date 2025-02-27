@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import WorkoutList from "../components/WorkoutList";
 import AddWorkout from "../components/AddWorkout";
 import { Container, Row, Col, Card } from "react-bootstrap";
+import WorkoutAnalysis from "../components/AreaChart";
 
 export default function UserDashboard() {
     const { data: session, status } = useSession();
@@ -65,16 +66,21 @@ export default function UserDashboard() {
                 </Col>
             </Row>
 
-            <Row>
-                <Col md={4}>
-                    <Card className="shadow-sm mb-4">
+            <Row className="mb-4">
+                <Col>
+                    <Card className="shadow-sm">
                         <Card.Body>
-                            <h3>Quick Stats</h3>
-                            <p>Coming soon...</p>
+                            <WorkoutAnalysis
+                                userId={session.user.id}
+                                refreshTrigger={refreshWorkouts}
+                            />
                         </Card.Body>
                     </Card>
                 </Col>
-                <Col md={8}>
+            </Row>
+
+            <Row>
+                <Col>
                     <Card className="shadow-sm">
                         <Card.Body>
                             <WorkoutList

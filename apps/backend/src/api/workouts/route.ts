@@ -8,7 +8,23 @@ console.log('Available models on prisma:', Object.keys(prisma));
 export async function POST(req: Request) {
   try {
     const body = await req.json() as any;
-    const { userId, type, duration, distance, gear, intensity, notes } = body;
+    const {
+      userId,
+      type,
+      duration,
+      distance,
+      gear,
+      intensity,
+      notes,
+      elevationGain,
+      heartRate,
+      calories,
+      averageSpeed,
+      maxSpeed,
+      cadence,
+      power,
+      stravaActivityId
+    } = body;
 
     if (!userId || !type || !duration) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -23,6 +39,14 @@ export async function POST(req: Request) {
         gear: gear || null,
         intensity: intensity || null,
         notes: notes || null,
+        elevationGain: elevationGain ? Number(elevationGain) : null,
+        heartRate: heartRate ? Number(heartRate) : null,
+        calories: calories ? Number(calories) : null,
+        averageSpeed: averageSpeed ? Number(averageSpeed) : null,
+        maxSpeed: maxSpeed ? Number(maxSpeed) : null,
+        cadence: cadence ? Number(cadence) : null,
+        power: power ? Number(power) : null,
+        stravaActivityId: stravaActivityId || null,
         source: WorkoutSource.MANUAL,
       }
     });
@@ -46,6 +70,9 @@ export async function GET(req: Request) {
     const workouts = await prisma.workout.findMany({
       where: {
         user: { id: userId }
+      },
+      orderBy: {
+        date: 'desc'
       }
     });
     return NextResponse.json(workouts);

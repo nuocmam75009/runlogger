@@ -38,6 +38,64 @@ export enum IntensityLevel {
   VERY_HARD = "VERY_HARD"
 }
 
+export interface WorkoutData {
+  id?: string;
+  userId: string;
+  type: WorkoutType;
+  duration: number;
+  distance?: number | null;
+  date?: Date;
+  source: WorkoutSource | string;
+  gear?: string | null;
+  intensity?: IntensityLevel | null;
+  notes?: string | null;
+  elevationGain?: number | null;
+  heartRate?: number | null;
+  calories?: number | null;
+  averageSpeed?: number | null;
+  maxSpeed?: number | null;
+  cadence?: number | null;
+  power?: number | null;
+  stravaActivityId?: string | null;
+}
+
+// Define a workout stats interface for charts
+export interface WorkoutStats {
+  date: string;
+  count: number;
+  duration: number;
+  distance: number;
+  elevationGain: number;
+  caloriesBurned: number;
+  heartRate?: number;
+  byType: {
+    [key in WorkoutType]?: {
+      count: number;
+      duration: number;
+      distance: number;
+    }
+  };
+}
+
+// Define a chart data interface for the workout analysis component
+export interface WorkoutStat {
+  date: string;
+  duration: number;
+  distance: number;
+  count: number;
+  elevationGain: number;
+  calories: number;
+  heartRate: number;
+  runningDuration?: number;
+  cyclingDuration?: number;
+  swimmingDuration?: number;
+  otherDuration?: number;
+  runningDistance?: number;
+  cyclingDistance?: number;
+  swimmingDistance?: number;
+  otherDistance?: number;
+}
+
 // Map Strava workout types to our internal enum types
 export const StravaToEnumWorkoutType: { [key: string]: WorkoutType } = {
   Run: WorkoutType.RUNNING,

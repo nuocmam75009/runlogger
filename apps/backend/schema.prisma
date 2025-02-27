@@ -92,17 +92,27 @@ enum WorkoutType {
 }
 
 model Workout {
-  id       String      @id @default(uuid())
-  userId   String      @map("user_id")
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type     WorkoutType
-  distance Float
-  duration Int // In minutes
-  date     DateTime    @default(now())
-  source   WorkoutSource
-  gear     String?
-  intensity IntensityLevel?
-  notes    String?
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            WorkoutType
+  distance        Float?          // Make distance optional with nullable
+  duration        Int             // In minutes
+  date            DateTime        @default(now())
+  source          WorkoutSource
+  gear            String?
+  intensity       IntensityLevel?
+  notes           String?
+  elevationGain   Float?          // Add elevation gain for charts
+  heartRate       Float?          // Add heart rate data
+  calories        Int?            // Add calories burned
+  averageSpeed    Float?          // Add average speed
+  maxSpeed        Float?          // Add max speed
+  cadence         Float?          // Add cadence data
+  power           Float?          // Add power data (watts)
+  stravaActivityId String?        // Store Strava activity ID for reference
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 
 enum WorkoutSource {
@@ -121,42 +131,4 @@ enum IntensityLevel {
   MODERATE
   HARD
   VERY_HARD
-}
-
-enum StravaWorkout {
-  athlete_id
-  name
-  sport_type {
-    WeightTraining
-    Run
-    IndoorBike
-    IndoorRun
-  }
-  intensity: IntensityLevel
-  distance
-  moving_time
-  start_date
-  average_speed
-  average_heartrate
-  max_heartrate
-  average_cadence
-  average_watts
-  max_watts
-  has_kudoed
-  average_temp
-  kudos_count
-  comment_count
-  athlete_count
-  photo_count
-  trainer
-  location_city
-  location_state
-  location_country
-  private
-  visibility
-  flagged
-  photo_count
-  GPX_file
-  private
-  manual
 }

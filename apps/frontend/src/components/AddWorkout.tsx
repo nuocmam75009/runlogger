@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Modal, Button } from 'react-bootstrap';
-import { WorkoutType, IntensityLevel, formatWorkoutType } from 'shared-types';
+import { WorkoutType, IntensityLevel, formatWorkoutType, WorkoutSource, WorkoutData } from 'shared-types';
 
 interface AddWorkoutProps {
   userId: string;
@@ -52,10 +52,14 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId, onWorkoutAdded }) => {
   const [gear, setGear] = useState('');
   const [intensity, setIntensity] = useState<IntensityLevel>(IntensityLevel.MODERATE);
   const [notes, setNotes] = useState('');
+  const [elevationGain, setElevationGain] = useState<number | ''>('');
+  const [heartRate, setHeartRate] = useState<number | ''>('');
+  const [calories, setCalories] = useState<number | ''>('');
   const [workoutTypes, setWorkoutTypes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [durationError, setDurationError] = useState<string | null>(null);
+  const [showAdvancedFields, setShowAdvancedFields] = useState(false);
 
   const router = useRouter();
   const { data: session } = useSession();
@@ -89,8 +93,12 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId, onWorkoutAdded }) => {
     setGear('');
     setIntensity(IntensityLevel.MODERATE);
     setNotes('');
+    setElevationGain('');
+    setHeartRate('');
+    setCalories('');
     setError(null);
     setDurationError(null);
+    setShowAdvancedFields(false);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -114,20 +122,28 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId, onWorkoutAdded }) => {
     const durationInMinutes = timeToMinutes(durationString);
 
     try {
+      const workoutData: WorkoutData = {
+        userId,
+        type: type as WorkoutType,
+        duration: durationInMinutes,
+        source: WorkoutSource.MANUAL,
+      };
+
+      // Add optional fields if they have values
+      if (distance) workoutData.distance = Number(distance);
+      if (gear) workoutData.gear = gear;
+      if (intensity) workoutData.intensity = intensity;
+      if (notes) workoutData.notes = notes;
+      if (elevationGain) workoutData.elevationGain = Number(elevationGain);
+      if (heartRate) workoutData.heartRate = Number(heartRate);
+      if (calories) workoutData.calories = Number(calories);
+
       const response = await fetch('/api/workouts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId,
-          type,
-          duration: durationInMinutes,
-          distance: distance ? Number(distance) : undefined,
-          gear: gear || undefined,
-          intensity,
-          notes: notes || undefined,
-        }),
+        body: JSON.stringify(workoutData),
       });
 
       if (!response.ok) {
@@ -259,6 +275,75 @@ const AddWorkout: React.FC<AddWorkoutProps> = ({ userId, onWorkoutAdded }) => {
                 ))}
               </select>
             </div>
+
+            <div className="mb-3">
+              <Button
+                variant="link"
+                className="p-0 text-decoration-none"
+                onClick={() => setShowAdvancedFields(!showAdvancedFields)}
+              >
+                <i className={`bi bi-chevron-${showAdvancedFields ? 'up' : 'down'} me-1`}></i>
+                {showAdvancedFields ? 'Hide' : 'Show'} Advanced Fields
+              </Button>
+            </div>
+
+            {showAdvancedFields && (
+              <div className="advanced-fields border rounded p-3 mb-3 bg-light">
+                <div className="row">
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="elevationGain" className="form-label">Elevation Gain (meters)</label>
+                    <input
+                      type="number"
+                      id="elevationGain"
+                      className="form-control"
+                      value={elevationGain}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setElevationGain(value === '' ? '' : parseFloat(value));
+                      }}
+                      min="0"
+                      step="1"
+                      placeholder="Optional"
+                    />
+                  </div>
+
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="heartRate" className="form-label">Avg Heart Rate (bpm)</label>
+                    <input
+                      type="number"
+                      id="heartRate"
+                      className="form-control"
+                      value={heartRate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setHeartRate(value === '' ? '' : parseFloat(value));
+                      }}
+                      min="0"
+                      max="250"
+                      step="1"
+                      placeholder="Optional"
+                    />
+                  </div>
+
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="calories" className="form-label">Calories Burned</label>
+                    <input
+                      type="number"
+                      id="calories"
+                      className="form-control"
+                      value={calories}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCalories(value === '' ? '' : parseFloat(value));
+                      }}
+                      min="0"
+                      step="1"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mb-3">
               <label htmlFor="notes" className="form-label">Notes</label>
